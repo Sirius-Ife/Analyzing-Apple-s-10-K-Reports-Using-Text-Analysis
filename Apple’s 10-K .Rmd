@@ -1,0 +1,176 @@
+---
+title: "apple's_10k"
+author: "sirius_ife"
+date: "2024-03-09"
+output: html_document
+---
+
+# Case Study: Analyzing Apple's 10-K Reports Using Text Analysis
+
+## Introduction
+In this case study, we'll analyze Apple's 10-K reports from the years 2020 to 2023 using text analysis techniques. We aim to gain insights into Apple's financial sentiment, track changes over time, and visualize key trends in the reports.
+
+## Setup and Data Preparation
+We begin by loading necessary packages for text analysis and reading the 10-K report files for each year.
+
+```{r}
+# Load necessary packages
+library(tidyverse)
+library(tidytext)
+library(SnowballC)
+library(wordcloud)
+library(Rcpp)
+
+# Read 10-K report files for each year
+file_2020 <- "2020.txt"
+apple_2020 <- readChar(file_2020, file.info(file_2020)$size)
+
+file_2021 <- "2021.txt"
+apple_2021 <- readChar(file_2021, file.info(file_2021)$size)
+
+file_2022 <- "2022.txt"
+apple_2022 <- readChar(file_2022, file.info(file_2022)$size)
+
+file_2023 <- "2023.txt"
+apple_2023 <- readChar(file_2023, file.info(file_2023)$size)
+
+# Load custom stopwords
+custom_stop_words <- read_csv("stop_words_list.csv", col_names = FALSE)
+
+# Load finance sentiment list
+lm_dict <- tidytext::get_sentiments('loughran')
+```
+
+## Data Processing
+Next, we preprocess the text data, tokenize it into words and sentences, remove stop words, and add sentiment labels.
+
+```{r}
+# Preprocess and tokenize the text data
+apple2020 <- tibble(apple_2020) %>%
+  unnest_tokens(sentence, apple_2020, token = 'sentences') %>%
+  mutate(sentence_num = row_number(), call = 'apple_2020') %>%
+  unnest_tokens(word, sentence, token = 'words') %>%
+  mutate(word_num = row_number()) %>%
+  anti_join(custom_stop_words, by = c('word' = 'X1')) %>%
+  inner_join(lm_dict, by = 'word')
+
+# Repeat the same process for other years (2021, 2022, 2023)
+apple2021 <- tibble(apple_2021) %>% 
+  unnest_tokens(sentence, apple_2021, token='sentences') %>% 
+  mutate(sentence_num = row_number(), call = 'apple_2021') %>% 
+  unnest_tokens(word, sentence) %>% 
+  mutate(word_num = row_number()) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  inner_join(lm_dict)
+
+apple2022 <- tibble(apple_2022) %>% 
+  unnest_tokens(sentence, apple_2022, token='sentences') %>% 
+  mutate(sentence_num = row_number(), call = 'apple_2022') %>% 
+  unnest_tokens(word, sentence) %>% 
+  mutate(word_num = row_number()) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  inner_join(lm_dict)
+
+apple2023 <- tibble(apple_2023) %>% 
+  unnest_tokens(sentence, apple_2023, token='sentences') %>% 
+  mutate(sentence_num = row_number(), call = 'apple_2023') %>% 
+  unnest_tokens(word, sentence) %>% 
+  mutate(word_num = row_number()) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  inner_join(lm_dict)
+
+# Combine dataframes for all years
+all_firms <- bind_rows(apple2020, apple2021, apple2022, apple2023)
+```
+
+## Sentiment Analysis
+We analyze the sentiment expressed in the reports and visualize the results.
+
+```{r}
+# Calculate sentiment percentages for each year
+apple20 <- all_firms %>% 
+  filter(call=='apple_2020') %>% #Just Amazon
+  group_by(call, sentiment) %>% 
+  summarize(count = n(), #Count
+            percent = count/(all_firms %>% filter(call=='apple_2020') %>% nrow())) #Percent for just Amazon
+
+apple21 <- all_firms %>% 
+  filter(call=='apple_2021') %>%
+  group_by(call, sentiment) %>% 
+  summarize(count = n(), percent = count/(all_firms %>% filter(call=='apple_2021') %>% nrow()))
+
+apple22 <- all_firms %>% 
+  filter(call=='apple_2022') %>%
+  group_by(call, sentiment) %>% 
+  summarize(count = n(), percent = count/(all_firms %>% filter(call=='apple_2022') %>% nrow()))
+
+apple23 <- all_firms %>% 
+  filter(call=='apple_2023') %>%
+  group_by(call, sentiment) %>% 
+  summarize(count = n(), percent = count/(all_firms %>% filter(call=='apple_2023') %>% nrow()))
+
+# Plot sentiment percentages over the years
+percentages <- bind_rows(apple20, apple21, apple22, apple23)
+print(percentages)
+
+percentages %>% 
+  ggplot(aes(x='', y=percent, fill=sentiment)) +
+  geom_bar(width=1, stat='identity') +
+  facet_wrap(~call, ncol = 2, scales = "free_x")
+```
+
+## Sentiment Trends Over Time
+We explore how sentiment varies over time within each year.
+
+```{r}
+# Plot sentiment trends over time for each year
+all_firms %>% 
+  group_by(call, sentence_num, sentiment) %>% 
+  summarize(n=n()) %>% 
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>% #Transpose the data for the plot
+  mutate(tone = positive - negative) %>% #Create "tone"
+  ggplot(aes(x=sentence_num, y=tone, fill=call)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~call, ncol = 2, scales = "free_x")
+```
+
+## Word Clouds
+Finally, we generate word clouds to visualize the most frequent words in the reports for each year.
+
+```{r}
+# Generate word clouds for each year
+set.seed(77) #Seed for random number
+cloud <- tibble(apple_2020) %>% #Create dataframe
+  unnest_tokens(word, apple_2020) %>% #Word tokens
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% #Remove stop words
+  group_by(word) %>% 
+  summarize(n = n()) %>% 
+  with(wordcloud(words=word, freq=n, min.freq=10, max.words=500, random.order=F, rot.per=0.30, colors=brewer.pal(8, "Dark2")))
+
+set.seed(77)
+cloud <- tibble(apple_2021) %>% 
+  unnest_tokens(word, apple_2021) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  group_by(word) %>% 
+  summarize(n = n()) %>% 
+  with(wordcloud(words=word, freq=n, min.freq=10, max.words=500, random.order=F, rot.per=0.30, colors=brewer.pal(8, "Dark2")))
+
+set.seed(77)
+cloud <- tibble(apple_2022) %>% 
+  unnest_tokens(word, apple_2022) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  group_by(word) %>% 
+  summarize(n = n()) %>% 
+  with(wordcloud(words=word, freq=n, min.freq=15, max.words=500, random.order=F, rot.per=0.30, colors=brewer.pal(8, "Dark2")))
+
+set.seed(77)
+cloud <- tibble(apple_2023) %>% 
+  unnest_tokens(word, apple_2023) %>% 
+  anti_join(custom_stop_words, by=c('word' = 'X1')) %>% 
+  group_by(word) %>% 
+  summarize(n = n()) %>% 
+  with(wordcloud(words=word, freq=n, min.freq=26, max.words=500, random.order=F, rot.per=0.30, colors=brewer.pal(8, "Dark2")))
+```
+
+## Conclusion
+In conclusion, our analysis of Apple's 10-K reports using text analysis techniques has provided valuable insights into the company's financial sentiment, trends over time, and key themes. This information can be useful for investors, analysts, and stakeholders in understanding Apple's performance and strategic focus.

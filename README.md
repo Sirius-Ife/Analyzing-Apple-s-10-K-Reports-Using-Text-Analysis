@@ -36,10 +36,3 @@ The analysis reveals insights into Apple's financial sentiment, trends over time
 
 - Ifeoluwa Abe - abeifeoluwa21@gmail.com
 
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-Feel free to customize the README.md file with additional details, acknowledgments, or instructions specific to your project. This README provides an overview of the project structure, instructions for running the analysis, and insights derived from the analysis.

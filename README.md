@@ -24,7 +24,7 @@ To run the analysis:
 
 1. Ensure you have R and RStudio installed on your system.
 2. Clone or download this repository to your local machine.
-3. Open the `apples_text_analysis.Rmd` file in RStudio.
+3. Open the `apples 10k.Rmd` file in RStudio.
 4. Install the required R packages mentioned in the code if you haven't already installed them.
 5. Run the code chunks in the R Markdown file sequentially to perform data processing, sentiment analysis, visualization, and word cloud generation.
 
